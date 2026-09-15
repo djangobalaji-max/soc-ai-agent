@@ -1,0 +1,52 @@
+# SLA mappings by severity level
+SLA_MATRIX = {
+    1: {"name": "Info", "ack_mins": 480, "respond_mins": 480},        # 8 hours
+    2: {"name": "Low", "ack_mins": 240, "respond_mins": 480},         # 4h ack, 8h respond
+    3: {"name": "Low", "ack_mins": 240, "respond_mins": 480},
+    4: {"name": "Medium", "ack_mins": 120, "respond_mins": 240},      # 2h ack, 4h respond
+    5: {"name": "Medium", "ack_mins": 120, "respond_mins": 240},
+    6: {"name": "High", "ack_mins": 60, "respond_mins": 120},         # 1h ack, 2h respond
+    7: {"name": "High", "ack_mins": 60, "respond_mins": 120},
+    8: {"name": "High", "ack_mins": 60, "respond_mins": 120},
+    9: {"name": "Critical", "ack_mins": 60, "respond_mins": 60},      # 1h both
+    10: {"name": "Critical", "ack_mins": 60, "respond_mins": 60},
+    11: {"name": "Critical", "ack_mins": 60, "respond_mins": 60},
+    12: {"name": "Critical", "ack_mins": 60, "respond_mins": 60},
+    13: {"name": "Critical", "ack_mins": 60, "respond_mins": 60},
+    14: {"name": "Critical", "ack_mins": 60, "respond_mins": 60},
+    15: {"name": "Critical", "ack_mins": 60, "respond_mins": 60},
+}
+
+def get_sla_info(alert):
+    """Calculate SLA times and remaining time"""
+    from datetime import datetime, timedelta
+    
+    level = alert.get("rule", {}).get("level", 3)
+    sla = SLA_MATRIX.get(level, SLA_MATRIX[3])
+    
+    # Parse alert timestamp
+    try:
+        alert_time = datetime.fromisoformat(alert.get("timestamp", "").replace("Z", "+00:00"))
+    except:
+        alert_time = datetime.utcnow()
+    
+    now = datetime.utcnow()
+    if alert_time.tzinfo:
+        now = now.replace(tzinfo=alert_time.tzinfo)
+    
+    # Calculate remaining time
+    ack_deadline = alert_time + timedelta(minutes=sla["ack_mins"])
+    respond_deadline = alert_time + timedelta(minutes=sla["respond_mins"])
+    
+    ack_remaining = int((ack_deadline - now).total_seconds() / 60)
+    respond_remaining = int((respond_deadline - now).total_seconds() / 60)
+    
+    return {
+        "severity": sla["name"],
+        "ack_mins": sla["ack_mins"],
+        "respond_mins": sla["respond_mins"],
+        "ack_remaining": max(0, ack_remaining),
+        "respond_remaining": max(0, respond_remaining),
+        "ack_breached": ack_remaining < 0,
+        "respond_breached": respond_remaining < 0
+    }
